@@ -311,7 +311,7 @@ function AppWithRoleLogic() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Only show role select modal if no role is stored
+  // Only show role select modal if userRole is not set, user is logged in, verified, not an approver, and not on landing page
   useEffect(() => {
     if (session) {
       // Check if user is verified
@@ -336,7 +336,6 @@ function AppWithRoleLogic() {
             if (!storedRole) {
               setPendingUser({ email: session.user.email, access_token: session.access_token });
               setShowRoleSelect(true);
-              localStorage.removeItem('userRole');
             } else {
               setShowRoleSelect(false);
             }
@@ -407,15 +406,20 @@ function AppWithRoleLogic() {
     setVerifyLoading(false);
   };
 
-  // Block all routes except landing and auth modals until role is chosen
-  // Only show modals if not on landing page
-  const isLanding = location.pathname === '/';
-  const blockApp = (!isLanding && (showRoleSelect || showPassKey || showVerifyModal));
+  // On logout, always clear userRole
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('userRole');
+    navigate('/');
+  };
+
+  // Block all routes except modals until role is chosen
+  const blockApp = showRoleSelect || showPassKey || showVerifyModal;
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Routes>
-        <Route path="/" element={<LandingPage session={session} onLogin={() => {}} />} />
+        {!blockApp && <Route path="/" element={<LandingPage session={session} onLogin={() => {}} />} />}
         {!blockApp && <Route path="/dashboard/*" element={<><Dashboard /><SwitchRoleButton /></>} />}
         {!blockApp && <Route path="/dashboard/report/:id" element={<ReportPage />} />}
         {!blockApp && <Route path="/dashboard/reports" element={<ReportsListPage />} />}
@@ -424,11 +428,11 @@ function AppWithRoleLogic() {
         {!blockApp && <Route path="*" element={<Navigate to="/" replace />} />}
       </Routes>
       {/* Role Select Modal */}
-      {!isLanding && <RoleSelectModal open={showRoleSelect} onSelect={handleRoleSelect} />}
+      <RoleSelectModal open={showRoleSelect} onSelect={handleRoleSelect} />
       {/* Pass Key Modal for new users */}
-      {!isLanding && <PassKeyModal open={showPassKey} onSubmit={handlePassKeySubmit} error={passKeyError} loading={passKeyLoading} />}
+      <PassKeyModal open={showPassKey} onSubmit={handlePassKeySubmit} error={passKeyError} loading={passKeyLoading} />
       {/* Email Verification Modal for unverified users */}
-      {!isLanding && <EmailVerificationModal open={showVerifyModal} onResend={handleResendVerification} loading={verifyLoading} />}
+      <EmailVerificationModal open={showVerifyModal} onResend={handleResendVerification} loading={verifyLoading} />
     </div>
   );
 }
